@@ -1,0 +1,4 @@
+image_id,filename,image_url,source,license,source_url
+P01,P01.jpg,https://upload.wikimedia.org/wikipedia/commons/8/82/Leading_edge_damage_-_windturbine.jpg,Wikimedia Commons / Belzona Polymerics Ltd.,CC0 1.0,https://commons.wikimedia.org/wiki/File:Leading_edge_damage_-_windturbine.jpg
+P02,P02.jpg,https://source.roboflow.com/V07KUEIfU6hiemy7y54a4pTeD072/1bK1h7dCSLpz2vFb3gP9/thumb.jpg,LEEv1.4 / Roboflow Universe,CC BY 4.0,https://universe.roboflow.com/dubai-international-academy/leev1.4
+P03,P03.jpg,https://source.roboflow.com/V07KUEIfU6hiemy7y54a4pTeD072/2XIpM3N0yZwSk7gH9LkT/thumb.jpg,LEEv1.4 / Roboflow Universe,CC BY 4.0,https://universe.roboflow.com/dubai-international-academy/leev1.4
