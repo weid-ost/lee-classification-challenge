@@ -23,6 +23,15 @@ async function getTable(table) {
   return response.json();
 }
 
+async function modifyTable(table, query, method, body) {
+  const response = await fetch(`${C.SUPABASE_URL}/rest/v1/${table}?${query}`, {
+    method,
+    headers: { ...apiHeaders(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  if (!response.ok) throw new Error(await response.text());
+}
+
 function csvCell(value) {
   const text = value == null ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value);
   return `"${text.replaceAll('"', '""')}"`;
@@ -55,10 +64,14 @@ function prepareData(participants, events) {
 function filteredParticipants() {
   const organisationType = document.querySelector('#organisationFilter')?.value || 'all';
   const completion = document.querySelector('#completionFilter')?.value || 'all';
+  const visibility = document.querySelector('#visibilityFilter')?.value || 'active';
   return dataset.participants.filter(participant => {
     const organisationMatches = organisationType === 'all' || participant.organisation_type === organisationType;
     const isComplete = dataset.submitted.has(participant.id);
-    return organisationMatches && (completion === 'all' || (completion === 'complete' ? isComplete : !isComplete));
+    const completionMatches = completion === 'all' || (completion === 'complete' ? isComplete : !isComplete);
+    const hidden = participant.excluded_from_dashboard === true;
+    const visibilityMatches = visibility === 'all' || (visibility === 'hidden' ? hidden : !hidden);
+    return organisationMatches && completionMatches && visibilityMatches;
   });
 }
 
@@ -88,10 +101,11 @@ function renderDashboard() {
   const images = [...new Set(dataset.assessments.map(event => event.image_id).filter(Boolean))].sort();
   root.innerHTML = `
     <section class="card dashboard-heading"><div><h1>Challenge results</h1><p class="muted">Private researcher view · latest saved assessment per participant and image</p></div><button class="btn" id="logout">Sign out</button></section>
-    <section class="card filter-card"><div class="filter-grid">
+    <section class="card filter-card"><div class="filter-grid filter-grid-four">
       <div class="field"><label>Organisation type</label><select id="organisationFilter"><option value="all">All organisation types</option>${organisationTypes.map(value => `<option>${esc(value)}</option>`).join('')}</select></div>
       <div class="field"><label>Completion status</label><select id="completionFilter"><option value="all">All participants</option><option value="complete">Complete</option><option value="incomplete">In progress</option></select></div>
       <div class="field"><label>Image</label><select id="imageFilter"><option value="all">All images</option>${images.map(value => `<option>${esc(value)}</option>`).join('')}</select></div>
+      <div class="field"><label>Dashboard visibility</label><select id="visibilityFilter"><option value="active">Active entries</option><option value="hidden">Hidden entries</option><option value="all">All entries</option></select></div>
     </div></section><div id="analysis"></div>`;
   document.querySelectorAll('.filter-card select').forEach(select => select.addEventListener('change', renderAnalysis));
   document.querySelector('#logout').onclick = () => { token = ''; dataset = null; renderLogin(); };
@@ -132,11 +146,45 @@ function renderAnalysis() {
       }).join('') || '<p>No IEA assessments match the current filters.</p>'}</div>
     </section>
     <section class="card"><div class="section-heading"><div><h2>Participants</h2><p class="muted">Personally identifying fields stay visible only in this admin-only page and the private export.</p></div><div class="actions compact"><button class="btn" id="participantsCsv">Participants CSV</button><button class="btn primary" id="analysisCsv">Analysis CSV</button></div></div>
-      <div class="table-wrap"><table class="results-table"><thead><tr><th>Name</th><th>Organisation</th><th>Type</th><th>Country</th><th>Status</th><th>Assessments</th></tr></thead><tbody>
-      ${participants.map(participant => `<tr><td>${esc(participant.name)}</td><td>${esc(participant.organisation)}</td><td>${esc(participant.organisation_type)}</td><td>${esc(participant.country)}</td><td><span class="status ${dataset.submitted.has(participant.id) ? 'complete-status' : ''}">${dataset.submitted.has(participant.id) ? 'Complete' : 'In progress'}</span></td><td>${dataset.assessments.filter(event => event.participant_id === participant.id).length}</td></tr>`).join('') || '<tr><td colspan="6">No participants match the current filters.</td></tr>'}
+      <div class="table-wrap"><table class="results-table"><thead><tr><th>Name</th><th>Organisation</th><th>Type</th><th>Country</th><th>Status</th><th>Assessments</th><th>Manage</th></tr></thead><tbody>
+      ${participants.map(participant => `<tr><td>${esc(participant.name || 'Anonymous')}</td><td>${esc(participant.organisation || '—')}</td><td>${esc(participant.organisation_type)}</td><td>${esc(participant.country)}</td><td><span class="status ${dataset.submitted.has(participant.id) ? 'complete-status' : ''}">${dataset.submitted.has(participant.id) ? 'Complete' : 'In progress'}</span>${participant.excluded_from_dashboard ? '<span class="status hidden-status">Hidden</span>' : ''}</td><td>${dataset.assessments.filter(event => event.participant_id === participant.id).length}</td><td><div class="row-actions"><button class="btn small-btn toggle-visibility" data-id="${participant.id}">${participant.excluded_from_dashboard ? 'Restore' : 'Hide'}</button><button class="btn danger small-btn delete-entry" data-id="${participant.id}">Delete entirely</button></div></td></tr>`).join('') || '<tr><td colspan="7">No participants match the current filters.</td></tr>'}
       </tbody></table></div></section>`;
   document.querySelector('#participantsCsv').onclick = () => downloadCsv('participants-filtered.csv', participants);
   document.querySelector('#analysisCsv').onclick = () => downloadCsv('challenge-analysis-long.csv', buildLongExport(participants, assessments));
+  document.querySelectorAll('.toggle-visibility').forEach(button => button.onclick = () => toggleVisibility(button.dataset.id));
+  document.querySelectorAll('.delete-entry').forEach(button => button.onclick = () => deleteEntry(button.dataset.id));
+}
+
+async function toggleVisibility(participantId) {
+  const participant = dataset.participants.find(item => item.id === participantId);
+  if (!participant) return;
+  const hidden = participant.excluded_from_dashboard !== true;
+  try {
+    await modifyTable('participants', `id=eq.${encodeURIComponent(participantId)}`, 'PATCH', { excluded_from_dashboard: hidden });
+    participant.excluded_from_dashboard = hidden;
+    renderAnalysis();
+  } catch (exception) {
+    alert(`Could not ${hidden ? 'hide' : 'restore'} this entry: ${exception.message}`);
+  }
+}
+
+async function deleteEntry(participantId) {
+  const participant = dataset.participants.find(item => item.id === participantId);
+  if (!participant) return;
+  const label = participant.name || participant.email || participantId;
+  if (!confirm(`Permanently delete ${label} and all of their saved challenge events? This cannot be undone.`)) return;
+  try {
+    await modifyTable('events', `participant_id=eq.${encodeURIComponent(participantId)}`, 'DELETE');
+    await modifyTable('participants', `id=eq.${encodeURIComponent(participantId)}`, 'DELETE');
+    dataset.participants = dataset.participants.filter(item => item.id !== participantId);
+    dataset.events = dataset.events.filter(item => item.participant_id !== participantId);
+    dataset.assessments = dataset.assessments.filter(item => item.participant_id !== participantId);
+    dataset.schemes.delete(participantId);
+    dataset.submitted.delete(participantId);
+    renderDashboard();
+  } catch (exception) {
+    alert(`Could not delete this entry: ${exception.message}`);
+  }
 }
 
 function buildLongExport(participants, assessments) {

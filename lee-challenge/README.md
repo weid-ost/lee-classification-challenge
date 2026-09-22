@@ -36,6 +36,10 @@ The supplied row-level-security rules allow anonymous participants to INSERT, bu
 
 `participants` stores registration details. `events` is append-only and stores the participant's custom scheme, each completed image assessment, and final submission. Append-only writes make autosave/submission possible without giving anonymous clients permission to read or update research data.
 
+## Dashboard record management
+
+The researcher dashboard can reversibly hide an entry from its normal view or permanently delete the participant and all linked events. Existing Supabase projects must first run `supabase-migration-admin-controls.sql` once in the Supabase SQL Editor. Hidden entries remain available through the dashboard's visibility filter and can be restored. Permanent deletion cannot be undone.
+
 ## Important prototype limitations
 
 - The current 30 cases are **30 cropped/zoomed assessment views derived from four openly available source images**, not 30 independent inspection cases. They are suitable for testing workflow, not for drawing scientific conclusions. See `ATTRIBUTION.md`.
