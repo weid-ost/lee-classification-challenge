@@ -64,14 +64,16 @@ function prepareData(participants, events) {
 function filteredParticipants() {
   const organisationType = document.querySelector('#organisationFilter')?.value || 'all';
   const completion = document.querySelector('#completionFilter')?.value || 'all';
+  const method = document.querySelector('#methodFilter')?.value || 'all';
   const visibility = document.querySelector('#visibilityFilter')?.value || 'active';
   return dataset.participants.filter(participant => {
     const organisationMatches = organisationType === 'all' || participant.organisation_type === organisationType;
     const isComplete = dataset.submitted.has(participant.id);
     const completionMatches = completion === 'all' || (completion === 'complete' ? isComplete : !isComplete);
+    const methodMatches = method === 'all' || (participant.submission_method || 'manual') === method;
     const hidden = participant.excluded_from_dashboard === true;
     const visibilityMatches = visibility === 'all' || (visibility === 'hidden' ? hidden : !hidden);
-    return organisationMatches && completionMatches && visibilityMatches;
+    return organisationMatches && completionMatches && methodMatches && visibilityMatches;
   });
 }
 
@@ -101,9 +103,10 @@ function renderDashboard() {
   const images = [...new Set(dataset.assessments.map(event => event.image_id).filter(Boolean))].sort();
   root.innerHTML = `
     <section class="card dashboard-heading"><div><h1>Challenge results</h1><p class="muted">Private researcher view · latest saved assessment per participant and image</p></div><button class="btn" id="logout">Sign out</button></section>
-    <section class="card filter-card"><div class="filter-grid filter-grid-four">
+    <section class="card filter-card"><div class="filter-grid">
       <div class="field"><label>Organisation type</label><select id="organisationFilter"><option value="all">All organisation types</option>${organisationTypes.map(value => `<option>${esc(value)}</option>`).join('')}</select></div>
       <div class="field"><label>Completion status</label><select id="completionFilter"><option value="all">All participants</option><option value="complete">Complete</option><option value="incomplete">In progress</option></select></div>
+      <div class="field"><label>Submission method</label><select id="methodFilter"><option value="all">Manual and computer vision</option><option value="manual">Manual</option><option value="computer_vision">Computer vision</option></select></div>
       <div class="field"><label>Image</label><select id="imageFilter"><option value="all">All images</option>${images.map(value => `<option>${esc(value)}</option>`).join('')}</select></div>
       <div class="field"><label>Dashboard visibility</label><select id="visibilityFilter"><option value="active">Active entries</option><option value="hidden">Hidden entries</option><option value="all">All entries</option></select></div>
     </div></section><div id="analysis"></div>`;
@@ -193,7 +196,7 @@ function buildLongExport(participants, assessments) {
   assessments.forEach(event => {
     const participant = participantMap.get(event.participant_id);
     if (!participant) return;
-    const common = { participant_id: participant.id, name: participant.name, email: participant.email, organisation: participant.organisation, organisation_type: participant.organisation_type, country: participant.country, completed: dataset.submitted.has(participant.id), image_id: event.image_id };
+    const common = { participant_id: participant.id, name: participant.name, email: participant.email, organisation: participant.organisation, organisation_type: participant.organisation_type, country: participant.country, submission_method: participant.submission_method || 'manual', model_name: participant.model_name, model_version: participant.model_version, model_url: participant.model_url, manual_correction: participant.manual_correction, confidence: event.payload?.confidence, completed: dataset.submitted.has(participant.id), image_id: event.image_id };
     Object.entries(event.payload?.iea || {}).forEach(([criterion, selected]) => rows.push({ ...common, scheme: 'IEA Task 46', criterion, selected_level: selected, selected_description: '' }));
     if (event.payload?.lercat) rows.push({ ...common, scheme: 'LERCat', criterion: 'Overall category', selected_level: event.payload.lercat, selected_description: '' });
     const scheme = dataset.schemes.get(participant.id) || [];
