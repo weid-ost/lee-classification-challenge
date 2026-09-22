@@ -5,6 +5,12 @@ alter table public.participants alter column name drop not null;
 alter table public.participants alter column organisation drop not null;
 alter table public.participants alter column email drop not null;
 alter table public.participants add column if not exists excluded_from_dashboard boolean not null default false;
+alter table public.participants add column if not exists submission_method text not null default 'manual';
+alter table public.participants add column if not exists model_name text;
+alter table public.participants add column if not exists model_version text;
+alter table public.participants add column if not exists model_description text;
+alter table public.participants add column if not exists model_url text;
+alter table public.participants add column if not exists manual_correction boolean;
 
 drop policy if exists "admins update participants" on public.participants;
 create policy "admins update participants" on public.participants for update to authenticated
