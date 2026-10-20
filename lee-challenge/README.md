@@ -1,12 +1,8 @@
 # Leading Edge Erosion Classification Challenge
 
-Open-source, GitHub-Pages-compatible research prototype for comparing three ways of classifying wind-turbine rotor-blade leading edge erosion:
+Open-source, GitHub-Pages-compatible research prototype for studying participant-defined classification schemes for wind-turbine rotor-blade leading edge erosion.
 
-1. IEA Wind Task 46 erosion classification (criteria assessed separately)
-2. LERCat categories A–E
-3. A participant-defined scheme with arbitrary criteria and severity levels
-
-Participants enter name, organisation, email, organisation type and country, define their own scheme, then assess 30 image views. Participants cannot read submitted results. A researcher-only dashboard can export participants and raw event data as CSV.
+Participants enter basic profile information, define their own scheme with arbitrary criteria and severity levels, then assess the challenge images. Participants cannot read submitted results. A researcher-only dashboard can export participants and classification data as CSV. Computer-vision participants define the same type of scheme in machine-readable JSON and upload predictions in a validated CSV.
 
 ## Architecture
 
@@ -42,8 +38,7 @@ The researcher dashboard can reversibly hide an entry from its normal view or pe
 
 ## Important prototype limitations
 
-- The current 30 cases are **30 cropped/zoomed assessment views derived from four openly available source images**, not 30 independent inspection cases. They are suitable for testing workflow, not for drawing scientific conclusions. See `ATTRIBUTION.md`.
-- Several IEA Task 46 criteria (especially mass loss and aerodynamic performance) cannot normally be inferred from a photograph alone. The UI therefore includes **Cannot determine from image** rather than forcing a false estimate.
+- The current three cases are prototype images suitable for testing the workflow, not for drawing scientific conclusions. See `ATTRIBUTION.md`.
 - Before public recruitment, add your ethics/consent/privacy wording, retention policy, contact details, and a bot/spam control (e.g. an Edge Function plus CAPTCHA/Turnstile).
 - Review the exact classification wording and study protocol with the research team before freezing the challenge.
 - For a formal study, version the image set and protocol and do not change them after recruitment begins.
