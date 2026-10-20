@@ -120,10 +120,6 @@ function renderAnalysis() {
   const participantIds = new Set(participants.map(participant => participant.id));
   const assessments = selectedAssessments();
   const completeCount = participants.filter(participant => dataset.submitted.has(participant.id)).length;
-  const lercatCounts = distribution(assessments.map(event => event.payload?.lercat).filter(Boolean), ['A', 'B', 'C', 'D', 'E']);
-  const ieaCriteria = [...new Set(assessments.flatMap(event => Object.keys(event.payload?.iea || {})))];
-  const cannotDetermine = assessments.flatMap(event => Object.values(event.payload?.iea || {})).filter(value => value === 'Cannot determine from image').length;
-  const ieaAnswers = assessments.reduce((total, event) => total + Object.keys(event.payload?.iea || {}).length, 0);
   const imageCount = new Set(assessments.map(event => event.image_id)).size;
   const schemeOwners = [...participantIds].filter(id => dataset.schemes.has(id));
   const criteriaCount = schemeOwners.reduce((total, id) => total + (dataset.schemes.get(id)?.length || 0), 0);
@@ -133,20 +129,10 @@ function renderAnalysis() {
       <div class="metric card"><span>Participants</span><strong>${participants.length}</strong></div>
       <div class="metric card"><span>Completed</span><strong>${completeCount}</strong><small>${percent(completeCount, participants.length)} of selection</small></div>
       <div class="metric card"><span>Image assessments</span><strong>${assessments.length}</strong><small>${imageCount} image${imageCount === 1 ? '' : 's'}</small></div>
-      <div class="metric card"><span>IEA cannot determine</span><strong>${percent(cannotDetermine, ieaAnswers)}</strong><small>${cannotDetermine} of ${ieaAnswers} criterion ratings</small></div>
+      <div class="metric card"><span>Defined criteria</span><strong>${criteriaCount}</strong><small>across ${schemeOwners.length} schemes</small></div>
     </section>
-    <section class="analysis-grid">
-      <div class="card"><h2>LERCat distribution</h2><p class="muted">Counts for the current participant and image filters.</p>${barChart(lercatCounts, 'lercat-bars')}</div>
-      <div class="card"><h2>Participant-defined schemes</h2><p class="muted">Custom schemes are not combined because their criteria and levels are participant-specific.</p>
-        <div class="summary-list"><div><span>Participants with a scheme</span><strong>${schemeOwners.length}</strong></div><div><span>Total custom criteria</span><strong>${criteriaCount}</strong></div><div><span>Mean criteria per scheme</span><strong>${schemeOwners.length ? (criteriaCount / schemeOwners.length).toFixed(1) : '—'}</strong></div></div></div>
-    </section>
-    <section class="card"><h2>IEA Task 46 distributions</h2><p class="muted">Each criterion is analysed separately. The numeric level is extracted from the stored label; “Cannot determine” remains its own category.</p>
-      <div class="iea-grid">${ieaCriteria.map(criterion => {
-        const values = assessments.map(event => event.payload?.iea?.[criterion]).filter(Boolean);
-        const labels = ['0', '1', '2', '3', '4', '5', 'Cannot determine'];
-        const normalised = values.map(value => value === 'Cannot determine from image' ? 'Cannot determine' : String(value).match(/^\d/)?.[0]).filter(Boolean);
-        return `<div class="criterion-chart"><h3>${esc(criterion)}</h3>${barChart(distribution(normalised, labels))}</div>`;
-      }).join('') || '<p>No IEA assessments match the current filters.</p>'}</div>
+    <section class="card"><h2>Participant-defined schemes</h2><p class="muted">Schemes are not combined because their criteria and levels are participant-specific. Download the analysis CSV for one row per image and criterion.</p>
+        <div class="summary-list"><div><span>Participants with a scheme</span><strong>${schemeOwners.length}</strong></div><div><span>Total custom criteria</span><strong>${criteriaCount}</strong></div><div><span>Mean criteria per scheme</span><strong>${schemeOwners.length ? (criteriaCount / schemeOwners.length).toFixed(1) : '—'}</strong></div></div>
     </section>
     <section class="card"><div class="section-heading"><div><h2>Participants</h2><p class="muted">Personally identifying fields stay visible only in this admin-only page and the private export.</p></div><div class="actions compact"><button class="btn" id="participantsCsv">Participants CSV</button><button class="btn primary" id="analysisCsv">Analysis CSV</button></div></div>
       <div class="table-wrap"><table class="results-table"><thead><tr><th>Name</th><th>Organisation</th><th>Type</th><th>Country</th><th>Status</th><th>Assessments</th><th>Manage</th></tr></thead><tbody>
@@ -197,13 +183,11 @@ function buildLongExport(participants, assessments) {
     const participant = participantMap.get(event.participant_id);
     if (!participant) return;
     const common = { participant_id: participant.id, name: participant.name, email: participant.email, organisation: participant.organisation, organisation_type: participant.organisation_type, country: participant.country, submission_method: participant.submission_method || 'manual', model_name: participant.model_name, model_version: participant.model_version, model_url: participant.model_url, manual_correction: participant.manual_correction, confidence: event.payload?.confidence, completed: dataset.submitted.has(participant.id), image_id: event.image_id };
-    Object.entries(event.payload?.iea || {}).forEach(([criterion, selected]) => rows.push({ ...common, scheme: 'IEA Task 46', criterion, selected_level: selected, selected_description: '' }));
-    if (event.payload?.lercat) rows.push({ ...common, scheme: 'LERCat', criterion: 'Overall category', selected_level: event.payload.lercat, selected_description: '' });
     const scheme = dataset.schemes.get(participant.id) || [];
     Object.entries(event.payload?.own || {}).forEach(([criterionId, levelId]) => {
       const criterion = scheme.find(item => item.id === criterionId);
       const level = criterion?.levels?.find(item => item.id === levelId);
-      rows.push({ ...common, scheme: 'Participant-defined', criterion: criterion?.name || criterionId, selected_level: level?.label || levelId, selected_description: level?.description || '' });
+      rows.push({ ...common, scheme: 'Own classification scheme', criterion: criterion?.name || criterionId, selected_level: level?.label || levelId, selected_description: level?.description || '' });
     });
   });
   return rows;
